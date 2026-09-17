@@ -1,9 +1,7 @@
-name: Build Fixed APK
+name: Build ZAAD Admin 2026
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 jobs:
   build:
@@ -16,14 +14,32 @@ jobs:
       - name: Unzip project
         run: |
           mkdir -p fixed
-          ZIP="$(find . -maxdepth 1 -type f -name '*.zip' | head -n 1)"
+          ZIP="$(find . -maxdepth 1 -type f -name '*.zip' | head -1)"
           unzip -q -o "$ZIP" -d fixed
-          PROJECT_DIR="$(dirname "$(find fixed -type f -name settings.gradle.kts | head -n 1)")"
+          PROJECT_DIR="$(dirname "$(find fixed -type f -path '*/app/build.gradle.kts' | head -1)")"
+          PROJECT_DIR="$(dirname "$PROJECT_DIR")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Change package to new ID
+        run: |
+          python3 - <<'PY'
+          import os, re
+          p = os.path.join(os.environ["PROJECT_DIR"], "app", "build.gradle.kts")
+          s = open(p, encoding="utf-8").read()
+          s = re.sub(
+              r'applicationId\s*=\s*"[^"]+"',
+              'applicationId = "com.zaad.admin2026"',
+              s
+          )
+          open(p, "w", encoding="utf-8").write(s)
+          PY
+
+      - name: Add new Firebase config
+        run: |
+          cp google-services.json "$PROJECT_DIR/app/google-services.json"
 
       - name: Fix JVM 17
         run: |
-          PROJECT_DIR="$(dirname "$(find fixed -type f -name settings.gradle.kts | head -n 1)")"
           cat >> "$PROJECT_DIR/app/build.gradle.kts" <<'EOF'
 
           android {
@@ -49,5 +65,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ZAAD-ADMIN-FIXED-APK
+          name: ZAAD-ADMIN-2026-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk

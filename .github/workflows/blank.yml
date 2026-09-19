@@ -1,4 +1,4 @@
-name: Build ZAAD Admin 2026
+name: Build ZAAD Admin Final
 
 on:
   workflow_dispatch:
@@ -19,10 +19,17 @@ jobs:
           PROJECT_DIR="$(dirname "$(find fixed -type f -name 'settings.gradle.kts' | head -1)")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Fix package
+      - name: Fix notification sound
         run: |
-          sed -i 's/com\.zaad\.admin2026/com.zaad.admin/g' "$PROJECT_DIR/app/src/main/java/com/zaad/admin/MainActivity.kt" || true
-          cp google-services.json "$PROJECT_DIR/app/google-services.json"
+          MAIN="$(find "$PROJECT_DIR/app/src/main/java" -type f -name 'MainActivity.kt' | head -1)"
+          SERVICE="$(find "$PROJECT_DIR/app/src/main/java" -type f -name 'ZaadMessagingService.kt' | head -1)"
+
+          if [ -n "$SERVICE" ]; then
+            sed -i 's/R\.raw\.zaad_order/android.provider.Settings.System.DEFAULT_NOTIFICATION_URI/g' "$SERVICE"
+          fi
+
+          echo "MainActivity: $MAIN"
+          echo "MessagingService: $SERVICE"
 
       - name: Fix JVM 17
         run: |
@@ -51,5 +58,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ZAAD-ADMIN-FINAL-APK
+          name: ZAAD-ADMIN-SOUND-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk

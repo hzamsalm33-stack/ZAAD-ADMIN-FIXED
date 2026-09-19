@@ -19,10 +19,9 @@ jobs:
           PROJECT_DIR="$(dirname "$(find fixed -type f -name 'settings.gradle.kts' | head -1)")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Set new package and Firebase
+      - name: Fix package
         run: |
-          sed -i 's/com\.zaad\.admin/com.zaad.admin2026/g' "$PROJECT_DIR/app/build.gradle.kts"
-          sed -i 's/com\.zaad\.admin/com.zaad.admin2026/g' "$PROJECT_DIR/app/src/main/AndroidManifest.xml" || true
+          sed -i 's/com\.zaad\.admin2026/com.zaad.admin/g' "$PROJECT_DIR/app/src/main/java/com/zaad/admin/MainActivity.kt" || true
           cp google-services.json "$PROJECT_DIR/app/google-services.json"
 
       - name: Fix JVM 17
@@ -52,5 +51,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ZAAD-ADMIN-2026-APK
+          name: ZAAD-ADMIN-FINAL-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk

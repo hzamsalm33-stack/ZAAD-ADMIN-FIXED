@@ -1,4 +1,4 @@
-name: Build ZAAD Admin Final
+name: Build ZAAD Sound Fix
 
 on:
   workflow_dispatch:
@@ -19,17 +19,10 @@ jobs:
           PROJECT_DIR="$(dirname "$(find fixed -type f -name 'settings.gradle.kts' | head -1)")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Fix notification sound
+      - name: Create new sound channel
         run: |
-          MAIN="$(find "$PROJECT_DIR/app/src/main/java" -type f -name 'MainActivity.kt' | head -1)"
-          SERVICE="$(find "$PROJECT_DIR/app/src/main/java" -type f -name 'ZaadMessagingService.kt' | head -1)"
-
-          if [ -n "$SERVICE" ]; then
-            sed -i 's/R\.raw\.zaad_order/android.provider.Settings.System.DEFAULT_NOTIFICATION_URI/g' "$SERVICE"
-          fi
-
-          echo "MainActivity: $MAIN"
-          echo "MessagingService: $SERVICE"
+          find "$PROJECT_DIR/app/src/main" -type f \( -name "*.kt" -o -name "*.xml" \) \
+          -exec sed -i 's/zaad_orders/zaad_orders_sound_v2/g' {} +
 
       - name: Fix JVM 17
         run: |
@@ -58,5 +51,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ZAAD-ADMIN-SOUND-APK
+          name: ZAAD-SOUND-FIX-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk

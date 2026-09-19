@@ -14,28 +14,15 @@ jobs:
       - name: Unzip project
         run: |
           mkdir -p fixed
-          ZIP="$(find . -maxdepth 1 -type f -name '*.zip' | head -1)"
+          ZIP="$(find . -maxdepth 1 -type f -name 'ZAAD-ADMIN-ANDROID-*.zip' | head -1)"
           unzip -q -o "$ZIP" -d fixed
-          PROJECT_DIR="$(dirname "$(find fixed -type f -path '*/app/build.gradle.kts' | head -1)")"
-          PROJECT_DIR="$(dirname "$PROJECT_DIR")"
+          PROJECT_DIR="$(dirname "$(find fixed -type f -name 'settings.gradle.kts' | head -1)")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Change package to new ID
+      - name: Set new package and Firebase
         run: |
-          python3 - <<'PY'
-          import os, re
-          p = os.path.join(os.environ["PROJECT_DIR"], "app", "build.gradle.kts")
-          s = open(p, encoding="utf-8").read()
-          s = re.sub(
-              r'applicationId\s*=\s*"[^"]+"',
-              'applicationId = "com.zaad.admin2026"',
-              s
-          )
-          open(p, "w", encoding="utf-8").write(s)
-          PY
-
-      - name: Add new Firebase config
-        run: |
+          sed -i 's/com\.zaad\.admin/com.zaad.admin2026/g' "$PROJECT_DIR/app/build.gradle.kts"
+          sed -i 's/com\.zaad\.admin/com.zaad.admin2026/g' "$PROJECT_DIR/app/src/main/AndroidManifest.xml" || true
           cp google-services.json "$PROJECT_DIR/app/google-services.json"
 
       - name: Fix JVM 17

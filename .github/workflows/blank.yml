@@ -19,18 +19,10 @@ jobs:
           PROJECT_DIR="$(dirname "$(find fixed -type f -name 'settings.gradle.kts' | head -1)")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Use Firebase config
-        run: |
-          cp google-services.json "$PROJECT_DIR/app/google-services.json"
-
-      - name: New application ID
-        run: |
-          sed -i 's/applicationId = "com.zaad.admin"/applicationId = "com.zaad.admin2026"/g' "$PROJECT_DIR/app/build.gradle.kts"
-
-      - name: New notification channel
+      - name: Fix notification sound channel
         run: |
           find "$PROJECT_DIR/app/src/main" -type f \( -name "*.kt" -o -name "*.xml" \) \
-          -exec sed -i 's/zaad_orders_sound_v2/zaad_orders_sound_v3/g; s/zaad_orders/zaad_orders_sound_v3/g' {} +
+          -exec sed -i 's/zaad_orders/zaad_orders_sound_final_2026/g' {} +
 
       - name: Fix JVM 17
         run: |
@@ -59,5 +51,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ZAAD-ADMIN-2026-APK
+          name: ZAAD-FINAL-2026-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk

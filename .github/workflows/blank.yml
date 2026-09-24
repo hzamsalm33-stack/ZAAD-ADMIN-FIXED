@@ -1,4 +1,4 @@
-name: Build ZAAD New Install
+name: Build ZAAD Native Final
 
 on:
   workflow_dispatch:
@@ -16,14 +16,306 @@ jobs:
           mkdir -p fixed
           ZIP="$(find . -maxdepth 1 -type f -name 'ZAAD-ADMIN-ANDROID-*.zip' | head -1)"
           unzip -q -o "$ZIP" -d fixed
-          PROJECT_DIR="$(dirname "$(find fixed -name 'settings.gradle.kts' | head -1)")"
+          PROJECT_DIR="$(dirname "$(find fixed -type f -name 'settings.gradle.kts' | head -1)")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Make new independent app
+      - name: Fix MainActivity
         run: |
-          sed -i 's/applicationId =  "com.zaad.admin"/applicationId = "com.zaad.admin.final2026"/' "$PROJECT_DIR/app/build.gradle.kts"
-          sed -i 's/"package_name": "com.zaad.admin"/"package_name": "com.zaad.admin.final2026"/' "$PROJECT_DIR/app/google-services.json"
+          cat > "$PROJECT_DIR/app/src/main/java/com/zaad/admin/MainActivity.kt" <<'KOTLIN'
+          package com.zaad.admin
 
+          import android.Manifest
+          import android.app.NotificationChannel
+          import android.app.NotificationManager
+          import android.content.pm.PackageManager
+          import android.media.AudioAttributes
+          import android.net.Uri
+          import android.os.Build
+          import android.os.Bundle
+          import android.webkit.JavascriptInterface
+          import android.webkit.JsResult
+          import android.webkit.WebChromeClient
+          import android.webkit.WebView
+          import android.webkit.WebViewClient
+          import android.widget.Toast
+          import androidx.appcompat.app.AppCompatActivity
+          import androidx.core.app.ActivityCompat
+          import com.google.firebase.messaging.FirebaseMessaging
+
+          class MainActivity : AppCompatActivity() {
+
+              private lateinit var webView: WebView
+              private var fcmToken: String? = null
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+
+                  createOrderChannel()
+                  requestNotificationPermission()
+
+                  webView = WebView(this)
+                  setContentView(webView)
+
+                  webView.settings.javaScriptEnabled = true
+                  webView.settings.domStorageEnabled = true
+
+                  webView.addJavascriptInterface(NativeBridge(), "ZAADNative")
+
+                  webView.webChromeClient = object : WebChromeClient() {
+                      override fun onJsAlert(
+                          view: WebView?,
+                          url: String?,
+                          message: String?,
+                          result: JsResult?
+                      ): Boolean {
+                          if (message?.contains("لا يدعم الإشعارات") == true) {
+                              enableNativeNotifications()
+                              result?.confirm()
+                              return true
+                          }
+                          return super.onJsAlert(view, url, message, result)
+                      }
+                  }
+
+                  webView.webViewClient = object : WebViewClient() {
+                      override fun onPageFinished(view: WebView?, url: String?) {
+                          injectNativeSupport()
+                          injectNativeToken()
+                      }
+                  }
+
+                  webView.loadUrl("https://broken-scene-80e2.hzamsalm33.workers.dev")
+
+                  FirebaseMessaging.getInstance().token.addOnSuccessListener {
+                      fcmToken = it
+                      injectNativeToken()
+                  }
+              }
+
+              private fun createOrderChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      val soundUri =
+                          Uri.parse("android.resource://$packageName/${R.raw.zaad_order}")
+
+                      val attrs = AudioAttributes.Builder()
+                          .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                          .build()
+
+                      val channel = NotificationChannel(
+                          "zaad_orders_native_2026",
+                          "طلبات زاد",
+                          NotificationManager.IMPORTANCE_HIGH
+                      ).apply {
+                          enableVibration(true)
+                          vibrationPattern =
+                              longArrayOf(0, 500, 250, 500, 250, 800)
+                          setSound(soundUri, attrs)
+                      }
+
+                      getSystemService(NotificationManager::class.java)
+                          .createNotificationChannel(channel)
+                  }
+              }
+
+              private fun requestNotificationPermission() {
+                  if (
+                      Build.VERSION.SDK_INT >= 33 &&
+                      ActivityCompat.checkSelfPermission(
+                          this,
+                          Manifest.permission.POST_NOTIFICATIONS
+                      ) != PackageManager.PERMISSION_GRANTED
+                  ) {
+                      ActivityCompat.requestPermissions(
+                          this,
+                          arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                          1001
+                      )
+                  }
+              }
+
+              private fun enableNativeNotifications() {
+                  requestNotificationPermission()
+
+                  FirebaseMessaging.getInstance().token.addOnSuccessListener {
+                      fcmToken = it
+                      injectNativeToken()
+
+                      Toast.makeText(
+                          this,
+                          "تم تفعيل إشعارات زاد",
+                          Toast.LENGTH_SHORT
+                      ).show()
+                  }
+              }
+
+              private fun injectNativeToken() {
+                  val token = fcmToken ?: return
+                  if (!::webView.isInitialized) return
+
+                  val escaped = token
+                      .replace("\\", "\\\\")
+                      .replace("'", "\\'")
+
+                  webView.post {
+                      webView.evaluateJavascript(
+                          """
+                          (function(){
+                              var token='$escaped';
+                              window.ZAAD_NATIVE_FCM_TOKEN=token;
+
+                              try {
+                                  localStorage.setItem(
+                                      'zaad_native_fcm_token',
+                                      token
+                                  );
+                              } catch(e) {}
+
+                              window.dispatchEvent(
+                                  new CustomEvent(
+                                      'zaad-native-fcm-token',
+                                      {detail:token}
+                                  )
+                              );
+                          })();
+                          """.trimIndent(),
+                          null
+                      )
+                  }
+              }
+
+              private fun injectNativeSupport() {
+                  webView.evaluateJavascript(
+                      """
+                      (function(){
+
+                          function sendToken(){
+                              try {
+                                  var token =
+                                      window.ZAADNative.getFcmToken();
+
+                                  if(token){
+                                      window.ZAAD_NATIVE_FCM_TOKEN=token;
+
+                                      window.dispatchEvent(
+                                          new CustomEvent(
+                                              'zaad-native-fcm-token',
+                                              {detail:token}
+                                          )
+                                      );
+                                  }
+                              } catch(e){}
+                          }
+
+                          function enableNative(){
+                              try {
+                                  window.ZAADNative.enableNotifications();
+                              } catch(e){}
+
+                              setTimeout(sendToken,300);
+                              setTimeout(sendToken,1200);
+
+                              document.querySelectorAll('*')
+                              .forEach(function(el){
+                                  if(
+                                      el.children.length===0 &&
+                                      (el.textContent||'')
+                                      .indexOf('الإشعارات غير مفعلة')!==-1
+                                  ){
+                                      el.textContent =
+                                      'الإشعارات مفعلة على Android ✅';
+                                  }
+                              });
+                          }
+
+                          function patchButton(){
+                              document.querySelectorAll('button')
+                              .forEach(function(btn){
+
+                                  var txt =
+                                      (btn.innerText ||
+                                      btn.textContent || '').trim();
+
+                                  if(
+                                      txt.indexOf('تفعيل الإشعارات')!==-1 &&
+                                      !btn.dataset.zaadNative
+                                  ){
+                                      var n=btn.cloneNode(true);
+
+                                      n.dataset.zaadNative='1';
+                                      n.removeAttribute('onclick');
+
+                                      btn.parentNode.replaceChild(n,btn);
+
+                                      n.addEventListener(
+                                          'click',
+                                          function(e){
+                                              e.preventDefault();
+                                              e.stopImmediatePropagation();
+                                              enableNative();
+                                          },
+                                          true
+                                      );
+                                  }
+                              });
+                          }
+
+                          patchButton();
+                          sendToken();
+
+                          new MutationObserver(function(){
+                              patchButton();
+                          }).observe(
+                              document.documentElement,
+                              {
+                                  childList:true,
+                                  subtree:true
+                              }
+                          );
+
+                      })();
+                      """.trimIndent(),
+                      null
+                  )
+              }
+
+              inner class NativeBridge {
+
+                  @JavascriptInterface
+                  fun getFcmToken(): String {
+                      return fcmToken ?: ""
+                  }
+
+                  @JavascriptInterface
+                  fun enableNotifications() {
+                      runOnUiThread {
+                          enableNativeNotifications()
+                      }
+                  }
+              }
+
+              override fun onBackPressed() {
+                  if (
+                      ::webView.isInitialized &&
+                      webView.canGoBack()
+                  ) {
+                      webView.goBack()
+                  } else {
+                      super.onBackPressed()
+                  }
+              }
+          }
+          KOTLIN
+
+      - name: Fix notification service
+        run: |
+          sed -i 's/zaad_orders/zaad_orders_native_2026/g' \
+          "$PROJECT_DIR/app/src/main/java/com/zaad/admin/ZaadMessagingService.kt"
+
+          sed -i 's/zaad_orders/zaad_orders_native_2026/g' \
+          "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+
+      - name: Fix Java 17
+        run: |
           cat >> "$PROJECT_DIR/app/build.gradle.kts" <<'EOF'
 
           android {
@@ -49,5 +341,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ZAAD-NEW-INSTALL-APK
+          name: ZAAD-NATIVE-FINAL-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk

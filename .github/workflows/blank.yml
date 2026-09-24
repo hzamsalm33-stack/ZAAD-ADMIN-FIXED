@@ -14,7 +14,7 @@ jobs:
       - name: Unzip project
         run: |
           mkdir -p fixed
-          ZIP="$(find . -maxdepth 1 -type f -name 'ZAAD-ADMIN-ANDROID-*.zip' | head -1)"
+          ZIP="./ZAAD-ADMIN-ANDROID-FIXED-FINAL.zip"
           unzip -q -o "$ZIP" -d fixed
           PROJECT_DIR="$(dirname "$(find fixed -type f -name 'settings.gradle.kts' | head -1)")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"

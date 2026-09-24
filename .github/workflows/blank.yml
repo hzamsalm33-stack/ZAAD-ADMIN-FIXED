@@ -1,4 +1,4 @@
-name: Build ZAAD Final Notification Fix
+name: Build ZAAD New Install
 
 on:
   workflow_dispatch:
@@ -11,16 +11,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Unzip Android project
+      - name: Unzip project
         run: |
           mkdir -p fixed
           ZIP="$(find . -maxdepth 1 -type f -name 'ZAAD-ADMIN-ANDROID-*.zip' | head -1)"
           unzip -q -o "$ZIP" -d fixed
-          PROJECT_DIR="$(dirname "$(find fixed -type f -name 'settings.gradle.kts' | head -1)")"
+          PROJECT_DIR="$(dirname "$(find fixed -name 'settings.gradle.kts' | head -1)")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Fix Java 17
+      - name: Make new independent app
         run: |
+          sed -i 's/applicationId =  "com.zaad.admin"/applicationId = "com.zaad.admin.final2026"/' "$PROJECT_DIR/app/build.gradle.kts"
+          sed -i 's/"package_name": "com.zaad.admin"/"package_name": "com.zaad.admin.final2026"/' "$PROJECT_DIR/app/google-services.json"
+
           cat >> "$PROJECT_DIR/app/build.gradle.kts" <<'EOF'
 
           android {
@@ -30,11 +33,6 @@ jobs:
               }
           }
           EOF
-
-      - name: New notification channel
-        run: |
-          find "$PROJECT_DIR/app/src/main" -type f \( -name "*.kt" -o -name "*.xml" \) \
-          -exec sed -i 's/zaad_orders/zaad_orders_final_2026/g' {} +
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -51,5 +49,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ZAAD-FINAL-NOTIFICATION-APK
+          name: ZAAD-NEW-INSTALL-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
